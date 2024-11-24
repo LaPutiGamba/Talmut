@@ -23,7 +23,7 @@ void ATGameState::SpawnDeckAndDiscardPile()
 
 void ATGameState::InitializeDeck()
 {
-	//Algo::RandomShuffle(CardTextures);
+	Algo::RandomShuffle(CardTextures);
 	DeckCards.Reserve(CardTextures.Num());
 
 	for (uint8 i = 0; i < CardTextures.Num(); i++) {
