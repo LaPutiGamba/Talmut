@@ -22,6 +22,7 @@ public:
 	void CreateSession(int32 NumPublicConnections, const FString& MatchType, const FString& PlayerName);
 	void FindSessions(int32 MaxSearchResult);
 	void JoinSession(const FOnlineSessionSearchResult& SessionResult);
+	UFUNCTION(BlueprintCallable, Category = "Multiplayer Sessions")
 	void DestroySession();
 	void StartSession();
 

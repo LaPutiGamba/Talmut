@@ -5,8 +5,6 @@
 #include "Interfaces/OnlineSessionInterface.h"
 #include "Menu.generated.h"
 
-
-
 UCLASS()
 class MULTIPLAYERSESSIONS_API UMenu : public UUserWidget
 {
@@ -19,6 +17,9 @@ public:
 protected:
 	virtual bool Initialize() override;
 
+	UFUNCTION(BlueprintCallable, Category = "Menu")
+	void MenuFindSessions();
+	
 	UFUNCTION()
 	void OnCreateSession(bool bWasSuccessful);
 	void OnFindSession(const TArray<FOnlineSessionSearchResult>& SessionResults, bool bWasSuccessful);

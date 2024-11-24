@@ -7,6 +7,10 @@ UGameDescriptionButton::UGameDescriptionButton()
 
 void UGameDescriptionButton::HandleButtonClicked()
 {
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Button Clicked - On Clicked"));
+	if (SessionResult.IsValid())
+		SetIsEnabled(false);
+	else
+		SetIsEnabled(true);
+	
     OnGameDescriptionButtonClicked.Broadcast(SessionResult);
 }

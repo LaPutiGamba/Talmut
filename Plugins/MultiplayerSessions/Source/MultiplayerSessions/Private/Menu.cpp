@@ -1,13 +1,12 @@
 #include "Menu.h"
-
 #include "GameDescriptionButton.h"
 #include "MultiplayerSessionsSubsystem.h"
 #include "Components/Button.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSessionSettings.h"
+#include "Components/RichTextBlock.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
-#include "Widgets/TBaseTextWidget.h"
 #include "GameFramework/PlayerState.h"
 
 void UMenu::MenuSetup(int32 NumberOfPublicConnections, FString TypeOfMatch, FString LobbyPath)
@@ -65,25 +64,28 @@ void UMenu::OnCreateSession(bool bWasSuccessful)
 	}
 }
 
+void UMenu::MenuFindSessions()
+{
+	if (MultiplayerSessionsSubsystem)
+		MultiplayerSessionsSubsystem->FindSessions(10000);
+}
+
 void UMenu::OnFindSession(const TArray<FOnlineSessionSearchResult>& SessionResults, bool bWasSuccessful)
 {
 	if (!MultiplayerSessionsSubsystem)
 		return;
 
-	FString ResultString = FString::Printf(TEXT("Session found: %d"), SessionResults.Num());
-	GEngine->AddOnScreenDebugMessage(-1, 20.f, FColor::Red, ResultString);
 	if (UUserWidget* ListWidget = Cast<UUserWidget>(GetWidgetFromName("WBPMenuListOfGames"))) {
 		if (UVerticalBox* ListOfGamesBox = Cast<UVerticalBox>(ListWidget->GetWidgetFromName("ListOfGames"))) {
 			ListOfGamesBox->ClearChildren();
 
 			for (auto Result : SessionResults) {
 				if (UUserWidget* GameDescription = CreateWidget<UUserWidget>(this, GameDescriptionClass)) {
-					if (UTBaseTextWidget* GameDescriptionText = Cast<UTBaseTextWidget>(GameDescription->GetWidgetFromName("Description"))) {
+					if (URichTextBlock* GameDescriptionText = Cast<URichTextBlock>(GameDescription->GetWidgetFromName("Description"))) {
 						FString Username;
 						Result.Session.SessionSettings.Get(TEXT("Username"), Username);
-						GEngine->AddOnScreenDebugMessage(-1, 20.f, FColor::Red, Username);
-						GameDescriptionText->InputText = FText::FromString(Username);
-						GameDescriptionText->UpdateBaseText(FText::FromString(Username));
+
+						GameDescriptionText->SetText(FText::FromString(Username));
 					}
 
 					if (UGameDescriptionButton* GameDescriptionButton = Cast<UGameDescriptionButton>(GameDescription->GetWidgetFromName("JoinButton"))) {
@@ -137,19 +139,15 @@ void UMenu::JoinButtonClicked_Implementation()
 {
 	JoinButton->SetIsEnabled(false);
 
-	if (MultiplayerSessionsSubsystem)
-		MultiplayerSessionsSubsystem->FindSessions(10000);
+	MenuFindSessions();
 }
 
 void UMenu::OnJoinButtonClicked(const FOnlineSessionSearchResult& Result)
 {
-	GEngine->AddOnScreenDebugMessage(-1, 20.f, FColor::Green, TEXT("Join button clicked - OnGameDescriptionButtonClicked"));
-	if (MultiplayerSessionsSubsystem && Result.IsValid())
-	{
-		FString Username;
-		Result.Session.SessionSettings.Get(TEXT("Username"), Username);
-		GEngine->AddOnScreenDebugMessage(-1, 20.f, FColor::Green, FString::Printf(TEXT("Joining session %s"), *Username));
+	if (MultiplayerSessionsSubsystem && Result.IsValid()) {
 		MultiplayerSessionsSubsystem->JoinSession(Result);
+
+		MenuUnSetup();
 	}
 }
 
