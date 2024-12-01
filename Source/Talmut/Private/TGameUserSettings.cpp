@@ -1,6 +1,7 @@
 #include "TGameUserSettings.h"
 #include "TGameplayStatics.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 UTGameUserSettings::UTGameUserSettings()
 {
@@ -32,8 +33,9 @@ void UTGameUserSettings::SetUIScale(float NewUIScale)
 	SaveSettings();
 }
 
-void UTGameUserSettings::SaveFOV(int NewFOV)
+void UTGameUserSettings::SetFOV(int NewFOV)
 {
+	UKismetSystemLibrary::ExecuteConsoleCommand(GetWorld(), FString::Printf(TEXT("fov %d"), NewFOV));
 	FOV = NewFOV;
 	SaveSettings();
 }

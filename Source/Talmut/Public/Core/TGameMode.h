@@ -12,7 +12,8 @@ class TALMUT_API ATGameMode : public AGameModeBase
 public:
 	ATGameMode();
 
-	virtual void StartPlay() override;
+	UFUNCTION(BlueprintCallable, Category = "GameMode")
+	void StartGame();
 
 protected:
 	virtual void BeginPlay() override;

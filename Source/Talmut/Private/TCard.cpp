@@ -112,6 +112,7 @@ void ATCard::ServerMoveDiscardedCard_Implementation(ATPawn* Pawn)
 {
 	if (auto GameState = GetWorld()->GetGameState<ATGameState>()) {
 		GameState->GetDiscardCards().Add(this);
+		Pawn->RemoveCardFromHand(this);
 
 		switch (CardValue) {
 		case EPokerCardValue::CV_Jack:

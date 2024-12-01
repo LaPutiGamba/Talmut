@@ -12,7 +12,7 @@ class MULTIPLAYERSESSIONS_API UMenu : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Menu")
-	void MenuSetup(int32 NumberOfPublicConnections = 4, FString TypeOfMatch = FString(TEXT("FreeForAll")), FString LobbyPath = FString(TEXT("/Game/Maps/Main")));
+	void MenuSetup(int32 NumberOfPublicConnections = 4, FString TypeOfMatch = FString(TEXT("FreeForAll")), FString LobbyPath = FString(TEXT("/Game/Maps/Main")), FString MenuPath = FString(TEXT("/Game/Maps/Menu")));
 
 protected:
 	virtual bool Initialize() override;
@@ -54,4 +54,5 @@ private:
 	int32 NumPublicConnections{ 4 };
 	FString MatchType{ TEXT("Talmut") };
 	FString PathToLobby{ TEXT("") };
+	FString PathToMenu{ TEXT("") };
 };

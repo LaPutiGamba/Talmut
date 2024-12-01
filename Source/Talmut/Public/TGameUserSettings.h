@@ -30,7 +30,7 @@ public:
 	float GetUIScale() const { return UIScale; }
 
 	UFUNCTION(BlueprintCallable, Category = "Settings")
-	void SaveFOV(int NewFOV);
+	void SetFOV(int NewFOV);
 
 	UFUNCTION(BlueprintPure)
 	int GetFOV() const { return FOV; }

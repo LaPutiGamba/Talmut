@@ -23,7 +23,7 @@ void ATGameState::SpawnDeckAndDiscardPile()
 
 void ATGameState::InitializeDeck()
 {
-	Algo::RandomShuffle(CardTextures);
+	//Algo::RandomShuffle(CardTextures);
 	DeckCards.Reserve(CardTextures.Num());
 
 	for (uint8 i = 0; i < CardTextures.Num(); i++) {
@@ -159,7 +159,7 @@ void ATGameState::MulticastSetStateOfTheGame_Implementation(EStateOfTheGame NewS
 
 		if (ATPawn* Pawn = Cast<ATPawn>(UGameplayStatics::GetPlayerPawn(GetWorld(), 0))) {
 			for (ATCard* HandCard : Pawn->GetHand())
-				HandCard->EnableCardCollision(true);
+				Pawn->AddInteractableCard(HandCard);
 		}
 		break;
 	default:
@@ -176,10 +176,10 @@ void ATGameState::ServerCallTalmut_Implementation(ATPawn* ATPawn)
 void ATGameState::ServerShowAllPlayerHands_Implementation()
 {
 	for (ATPawn* Pawn : Pawns) {
-		for (ATCard* Card : Pawn->GetHand()) {
-			FRotator Rotation = Card->GetActorRotation();
+		for (ATCard* HandCard : Pawn->GetHand()) {
+			FRotator Rotation = HandCard->GetActorRotation();
 			Rotation.Roll = 0.f;
-			Card->ServerMoveCard(Card->GetActorLocation(), Rotation);
+			HandCard->ServerMoveCard(HandCard->GetActorLocation(), Rotation);
 		}
 	}
 }

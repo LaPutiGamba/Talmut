@@ -25,10 +25,8 @@ public:
 	FVector CalculateDrawnTargetLocation();
 
 	TArray<TObjectPtr<class ATCard>> GetHand() const { return Hand; }
-	void AddCardToHand(class ATCard* Card) { Hand.Add(Card); }
-
-	TObjectPtr<class ATCard> GetSelectedCard() const { return SelectedCard; }
-	TObjectPtr<class ATCard> GetDrawedCard() const { return DrawedCard; }
+	void AddCardToHand(class ATCard* Card) { if (!Hand.Contains(Card)) Hand.Add(Card); }
+	void RemoveCardFromHand(class ATCard* Card) { if (Hand.Contains(Card)) Hand.Remove(Card); }
 
 	void IncreaseJackActivated() { JackActivated++; }
 	void IncreaseQueenActivated() { QueenActivated++; }
@@ -37,6 +35,11 @@ public:
 	void IncreaseKingActivated() { KingActivated++; }
 	UFUNCTION(Client, Reliable)
 	void ClientStartKingActivated();
+
+	void AddInteractableCard(ATCard* CardToAdd);
+	void RemoveInteractableCard(ATCard* CardToRemove);
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastAddInteractableCard(ATPawn* Pawn, ATCard* CardToAdd);
 
 protected:
 	virtual void BeginPlay() override;
@@ -48,29 +51,40 @@ protected:
 
 	void SelectCard(class ATCard* CardToSelect, bool bSelectIt);
 
+	UFUNCTION(Exec)
+	void PrintInteractableCards();
+	UFUNCTION(Exec)
+	void PrintHandCards();
+
 private:
 	void OnMouseClick();
 	void OnPlayerPressSpace();
 
 	UFUNCTION(Server, Reliable)
-	void ServerGetDeckCard();
+	void ServerGetDeckCard(class ATPawn* Pawn);
 	UFUNCTION(Server, Reliable)
-	void ServerGetDiscardCard();
+	void ServerGetDiscardCard(class ATPawn* Pawn);
 	UFUNCTION(Server, Reliable)
-	void ServerGetPenaltyCard();
+	void ServerGetPenaltyCard(class ATPawn* Pawn);
 
 	bool ExecuteCardAbility(class ATCard* Card);
 	void FlipCard(class ATCard* Card);
-	UFUNCTION(Client, Reliable)
-	void ClientEnableCardCollision(class ATCard* Card, bool bEnable);
+
 	UFUNCTION(Server, Reliable)
 	void ServerMoveCards(class ATCard* CardToMove, const FVector& TargetLocation, const FRotator& TargetRotation);
 
 	UFUNCTION(Server, Reliable)
-	void ServerAddDrawedCard(class ATCard* CardToAdd, class ATCard* CardToRemove);
+	void ServerChangeHandCard(class ATPawn* PawnToModify, class ATCard* CardToAdd, class ATCard* CardToRemove);
 
 	UFUNCTION(Server, Reliable)
 	void ServerCallTalmut();
+
+	void UpdateInteractableCardsCollisions(TArray<class ATCard*> OldInteractableCards);
+
+	UFUNCTION(Server, Reliable)
+	void ServerChangeHandCardCollisions(class ATPawn* StolenCardPawn, class ATPawn* HandCardPawn, class ATCard* StolenCard, class ATCard* HandCard);
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastChangeHandCardCollisions(class ATPawn* StolenCardPawn, class ATPawn* HandCardPawn, class ATCard* StolenCard, class ATCard* HandCard);
 
 private:
 	UPROPERTY(EditAnywhere, Category = "Pawn|Input")
@@ -87,6 +101,7 @@ private:
 
 	UPROPERTY(Replicated)
 	TArray<TObjectPtr<class ATCard>> Hand;
+	TArray<TObjectPtr<class ATCard>> InteractableCards;
 
 	UPROPERTY(Replicated)
 	TObjectPtr<class ATCard> DrawedCard;

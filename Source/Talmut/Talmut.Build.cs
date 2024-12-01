@@ -9,11 +9,11 @@ public class Talmut : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG", "Slate", "SlateCore", "AdvancedSessions", "AdvancedSteamSessions", "MultiplayerSessions" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG", "Slate", "SlateCore", "AdvancedSessions", "AdvancedSteamSessions", "MoviePlayer" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {});
 
-		PublicIncludePathModuleNames.AddRange(new string[] { "AdvancedSessions", "AdvancedSteamSessions" });
+		PublicIncludePathModuleNames.AddRange(new string[] { "AdvancedSessions", "AdvancedSteamSessions", "MultiplayerSessions" });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

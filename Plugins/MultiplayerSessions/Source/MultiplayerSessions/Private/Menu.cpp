@@ -9,11 +9,12 @@
 #include "Components/VerticalBox.h"
 #include "GameFramework/PlayerState.h"
 
-void UMenu::MenuSetup(int32 NumberOfPublicConnections, FString TypeOfMatch, FString LobbyPath)
+void UMenu::MenuSetup(int32 NumberOfPublicConnections, FString TypeOfMatch, FString LobbyPath, FString MenuPath)
 {
 	NumPublicConnections = NumberOfPublicConnections;
 	MatchType = TypeOfMatch;
 	PathToLobby = FString::Printf(TEXT("%s?listen"), *LobbyPath);
+	PathToMenu = MenuPath;
 
 	AddToViewport();
 	SetVisibility(ESlateVisibility::Visible);
@@ -111,6 +112,7 @@ void UMenu::OnJoinSession(EOnJoinSessionCompleteResult::Type Result)
 			FString Address;
 			SessionInterface->GetResolvedConnectString(NAME_GameSession, Address);
 
+			UE_LOG(LogTemp, Warning, TEXT("Joining %s"), *Address);
 			if (APlayerController* PlayerController = GetGameInstance()->GetFirstLocalPlayerController())
 				PlayerController->ClientTravel(Address, ETravelType::TRAVEL_Absolute);
 		}
@@ -119,6 +121,10 @@ void UMenu::OnJoinSession(EOnJoinSessionCompleteResult::Type Result)
 
 void UMenu::OnDestroySession(bool bWasSuccessful)
 {
+	if (bWasSuccessful) {
+		if (UWorld* World = GetWorld())
+			World->ServerTravel(PathToMenu, true);
+	}
 }
 
 void UMenu::OnStartSession(bool bWasSuccessful)

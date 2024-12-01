@@ -44,15 +44,13 @@ void ATGameMode::BeginPlay()
 	}
 }
 
-void ATGameMode::StartPlay()
+void ATGameMode::StartGame()
 {
-	Super::StartPlay();
-
-    if (TGameState) {
+	if (TGameState) {
         FTimerHandle TimerHandle;
 		GetWorldTimerManager().SetTimer(TimerHandle, [this]() {
             TGameState->SpawnDeckAndDiscardPile();
 			TGameState->InitializeDeck();
-		}, 2.0f, false);
+		}, 4.0f, false);
     }
 }

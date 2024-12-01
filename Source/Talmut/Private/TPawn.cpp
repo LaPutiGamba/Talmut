@@ -5,6 +5,7 @@
 #include "TDeck.h"
 #include "TDiscardPile.h"
 #include "Core/TGameState.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
 ATPawn::ATPawn()
@@ -68,10 +69,10 @@ void ATPawn::OnMouseClick()
 
 		if (DrawedCard) {
 			// If the player has a drawn card, add it to the player's hand
-			ServerAddDrawedCard(DrawedCard, Card);
+			ServerChangeHandCard(this, DrawedCard, Card);
 
-			Card->EnableCardCollision(false);
-			DrawedCard->EnableCardCollision(true);
+			RemoveInteractableCard(Card);
+			AddInteractableCard(DrawedCard);
 
 			FVector HandCardLocation = Card->GetActorLocation();
 			FRotator HandCardRotation = Card->GetActorRotation();
@@ -90,7 +91,8 @@ void ATPawn::OnMouseClick()
 			if (Card == SelectedCard) {
 				SelectCard(SelectedCard, false);
 			} else {
-				SelectCard(SelectedCard, false);
+				if (SelectedCard)
+					SelectCard(SelectedCard, false);
 				SelectCard(Card, true);
 			}
 		}
@@ -98,6 +100,7 @@ void ATPawn::OnMouseClick()
 		if (DrawedCard) {
 			// If the player has a drawn card, add it to the discard pile
 			DrawedCard->ServerMoveDiscardedCard(this);
+			RemoveInteractableCard(DrawedCard);
 
 			ServerEndTurn();
 		} else if (SelectedCard) {
@@ -106,22 +109,22 @@ void ATPawn::OnMouseClick()
 					if (SelectedCard->GetCardValue() == LastDiscardedCard->GetCardValue()) {
 						// If the player has a selected card, add it to the discard pile if it's the same value as the last discarded card
 						SelectedCard->ServerMoveDiscardedCard(this);
-						Hand.Remove(SelectedCard);
-						SelectedCard->EnableCardCollision(false);
+						RemoveInteractableCard(SelectedCard);
+
 						SelectedCard->GetCardMesh()->SetRenderCustomDepth(false);
 						SelectedCard = nullptr;
 					} else {
 						// If not, the player can't discard the card and will receive a new card from the deck as a penalty
 						if (Hand.Num() < 6) {
-							ServerGetPenaltyCard();
+							ServerGetPenaltyCard(this);
 							SelectCard(SelectedCard, false);
 						}
 					}
 				}
 			}
 		} else {
-			if (TGameState->IsPlayerTurn(this)) {
-				ServerGetDiscardCard();
+			if (TGameState->IsPlayerTurn(this) && !DrawedCard) {
+				ServerGetDiscardCard(this);
 				TGameState->DiscardPile->EnableBoxCollision(false);
 				TGameState->Deck->EnableBoxCollision(false);
 				bIsDiscardedCard = true;
@@ -129,7 +132,8 @@ void ATPawn::OnMouseClick()
 		}
 	} else if (HitActor->IsA<ATDeck>()) {
 		// If it's the player's turn, get a card from the deck and add it to the player's hand
-		ServerGetDeckCard();
+		if (TGameState->IsPlayerTurn(this) && !DrawedCard)
+			ServerGetDeckCard(this);
 	}
 }
 
@@ -153,7 +157,7 @@ void ATPawn::OnPlayerPressSpace()
 	}
 }
 
-void ATPawn::ServerGetDeckCard_Implementation()
+void ATPawn::ServerGetDeckCard_Implementation(ATPawn* Pawn)
 {
 	if (TGameState->GetDeckCards().Num() > 0) {
 		DrawedCard = TGameState->GetDeckCards().Pop();
@@ -166,10 +170,12 @@ void ATPawn::ServerGetDeckCard_Implementation()
 
 		TargetRotation.Roll = 0.f;
 		DrawedCard->ServerMoveDrawedCard(TargetLocation, TargetRotation, this);
+
+		MulticastAddInteractableCard(Pawn, DrawedCard);
 	}
 }
 
-void ATPawn::ServerGetDiscardCard_Implementation()
+void ATPawn::ServerGetDiscardCard_Implementation(ATPawn* Pawn)
 {
 	if (TGameState->GetDiscardCards().Num() > 0) {
 		DrawedCard = TGameState->GetDiscardCards().Pop();
@@ -182,18 +188,19 @@ void ATPawn::ServerGetDiscardCard_Implementation()
 
 		TargetRotation.Roll = 0.f;
 		DrawedCard->ServerMoveDrawedCard(TargetLocation, TargetRotation, this);
+
+		MulticastAddInteractableCard(Pawn, DrawedCard);
 	}
 }
 
-void ATPawn::ServerGetPenaltyCard_Implementation()
+void ATPawn::ServerGetPenaltyCard_Implementation(ATPawn* Pawn)
 {
 	if (TGameState->GetDeckCards().Num() > 0) {
 		DrawedCard = TGameState->GetDeckCards().Pop();
 		DrawedCard->SetOwner(this);
 
-		DrawedCard->EnableCardCollision(true);
-
 		Hand.Add(DrawedCard);
+		MulticastAddInteractableCard(Pawn, DrawedCard);
 
 		FVector TargetLocation = CalculateHandTargetLocation();
 		FRotator TargetRotation = GetActorRotation();
@@ -241,7 +248,6 @@ void ATPawn::ServerEndTurn_Implementation()
 
 void ATPawn::SelectCard(ATCard* CardToSelect, bool bSelectIt)
 {
-	UE_LOG(LogTemp, Warning, TEXT("SelectCard"));
 	if (Hand.Contains(CardToSelect)) {
 		if (bSelectIt) {
 			SelectedCard = CardToSelect;
@@ -270,14 +276,12 @@ bool ATPawn::ExecuteCardAbility(ATCard* Card)
 
 		TGameState->DiscardPile->EnableBoxCollision(true);
 		for (ATPawn* Pawn : TGameState->GetPawns()) {
-			if (Pawn == this) {
-				for (ATCard* HandCard : Pawn->GetHand())
-					HandCard->EnableCardCollision(true);
-				continue;
+			for (ATCard* HandCard : Pawn->GetHand()) {
+				if (Pawn != this)
+					RemoveInteractableCard(HandCard);
+				else
+					AddInteractableCard(HandCard);
 			}
-
-			for (ATCard* HandCard : Pawn->GetHand())
-				HandCard->EnableCardCollision(false);
 		}
 
 		return true;
@@ -291,37 +295,24 @@ bool ATPawn::ExecuteCardAbility(ATCard* Card)
 		if (KingHandCard && KingStolenCard) {
 			KingActivated--;
 
+			ATPawn* KingStolenCardPawn = nullptr;
+
+			// Enabling discard pile collisions
 			TGameState->DiscardPile->EnableBoxCollision(true);
-			for (ATPawn* Pawn : TGameState->GetPawns()) {
-				if (Pawn == this) {
-					for (ATCard* HandCard : Pawn->GetHand())
-						HandCard->EnableCardCollision(true);
-					continue;
-				}
-
-				for (ATCard* HandCard : Pawn->GetHand())
-					HandCard->EnableCardCollision(false);
-			}
-
+			// Removing other players collisions
 			for (ATPawn* Pawn : TGameState->GetPawns()) {
 				for (ATCard* HandCard : Pawn->GetHand()) {
-					if (HandCard == KingHandCard) {
-						Pawn->GetHand().Remove(KingHandCard);
-						Pawn->GetHand().Add(KingStolenCard);
-						break;
-					}
-					if (HandCard == KingStolenCard) {
-						Pawn->GetHand().Remove(KingStolenCard);
-						Pawn->GetHand().Add(KingHandCard);
-						Pawn->ClientEnableCardCollision(KingStolenCard, false);
-						Pawn->ClientEnableCardCollision(KingHandCard, true);
-						break;
-					}
+					if (Pawn != this)
+						RemoveInteractableCard(HandCard);
+					else
+						AddInteractableCard(HandCard);
+
+					if (HandCard == KingStolenCard)
+						KingStolenCardPawn = Pawn;
 				}
 			}
 
-			KingHandCard->EnableCardCollision(false);
-			KingStolenCard->EnableCardCollision(true);
+			ServerChangeHandCardCollisions(KingStolenCardPawn, this, KingStolenCard, KingHandCard);
 
 			FVector HandCardLocation = KingHandCard->GetActorLocation();
 			FVector StolenCardLocation = KingStolenCard->GetActorLocation();
@@ -356,23 +347,16 @@ void ATPawn::FlipCard(ATCard* Card)
 	}, 3.0f, false);
 }
 
-void ATPawn::ClientEnableCardCollision_Implementation(class ATCard* Card, bool bEnable)
-{
-	Card->EnableCardCollision(bEnable);
-}
-
 void ATPawn::ClientStartQueenActivated_Implementation()
 {
 	TGameState->DiscardPile->EnableBoxCollision(false);
-	for (ATPawn* GSPawn : TGameState->GetPawns()) {
-		if (GSPawn == this) {
-			for (ATCard* HandCard : GSPawn->GetHand())
-				HandCard->EnableCardCollision(false);
-			continue;
+	for (ATPawn* Pawn : TGameState->GetPawns()) {
+		for (ATCard* HandCard : Pawn->GetHand()) {
+			if (Pawn != this)
+				AddInteractableCard(HandCard);
+			else
+				RemoveInteractableCard(HandCard);
 		}
-
-		for (ATCard* HandCard : GSPawn->GetHand())
-			HandCard->EnableCardCollision(true);
 	}
 }
 
@@ -381,7 +365,7 @@ void ATPawn::ClientStartKingActivated_Implementation()
 	TGameState->DiscardPile->EnableBoxCollision(false);
 	for (ATPawn* GSPawn : TGameState->GetPawns()) {
 		for (ATCard* HandCard : GSPawn->GetHand())
-			HandCard->EnableCardCollision(true);
+			AddInteractableCard(HandCard);
 	}
 }
 
@@ -396,12 +380,78 @@ void ATPawn::ServerCallTalmut_Implementation()
 		TGameState->ServerCallTalmut(this);
 }
 
-void ATPawn::ServerAddDrawedCard_Implementation(ATCard* CardToAdd, ATCard* CardToRemove)
+void ATPawn::ServerChangeHandCard_Implementation(ATPawn* PawnToModify, ATCard* CardToAdd, ATCard* CardToRemove)
 {
-	if (Hand.Contains(CardToRemove))
-		Hand.Remove(CardToRemove);
+	AActor* CardToAddOwner = CardToAdd->GetOwner();
+	AActor* CardToRemoveOwner = CardToRemove->GetOwner();
 
-	Hand.Add(CardToAdd);
+	if (PawnToModify->GetHand().Contains(CardToRemove))
+		PawnToModify->RemoveCardFromHand(CardToRemove);
+
+	PawnToModify->AddCardToHand(CardToAdd);
+
+	CardToRemove->SetOwner(CardToAddOwner);
+	CardToAdd->SetOwner(CardToRemoveOwner);
+
+	ForceNetUpdate();
+}
+
+void ATPawn::AddInteractableCard(ATCard* CardToAdd)
+{
+	if (!InteractableCards.Contains(CardToAdd)) {
+		TArray<ATCard*> OldInteractableCards = InteractableCards;
+		InteractableCards.Add(CardToAdd);
+
+		UpdateInteractableCardsCollisions(OldInteractableCards);
+	}
+}
+
+void ATPawn::RemoveInteractableCard(ATCard* CardToRemove)
+{
+	if (InteractableCards.Contains(CardToRemove)) {
+		TArray<ATCard*> OldInteractableCards = InteractableCards;
+		InteractableCards.Remove(CardToRemove);
+
+		UpdateInteractableCardsCollisions(OldInteractableCards);
+	}
+}
+
+void ATPawn::MulticastAddInteractableCard_Implementation(ATPawn* Pawn, ATCard* CardToAdd)
+{
+	if (Pawn == UGameplayStatics::GetPlayerPawn(this, 0))
+		AddInteractableCard(CardToAdd);
+	else
+		RemoveInteractableCard(CardToAdd);
+}
+
+void ATPawn::UpdateInteractableCardsCollisions(TArray<class ATCard*> OldInteractableCards)
+{
+	for (ATCard* Card : OldInteractableCards)
+		Card->EnableCardCollision(false);
+	
+	for (ATCard* Card : InteractableCards)
+		Card->EnableCardCollision(true);
+}
+
+void ATPawn::ServerChangeHandCardCollisions_Implementation(class ATPawn* StolenCardPawn, class ATPawn* HandCardPawn, class ATCard* StolenCard, class ATCard* HandCard)
+{
+	ServerChangeHandCard(StolenCardPawn, HandCard, StolenCard);
+	ServerChangeHandCard(HandCardPawn, StolenCard, HandCard);
+
+	MulticastChangeHandCardCollisions(StolenCardPawn, HandCardPawn, StolenCard, HandCard);
+}
+
+void ATPawn::MulticastChangeHandCardCollisions_Implementation(class ATPawn* StolenCardPawn, class ATPawn* HandCardPawn, class ATCard* StolenCard, class ATCard* HandCard)
+{
+	if (StolenCardPawn == UGameplayStatics::GetPlayerPawn(this, 0))
+		StolenCardPawn->RemoveInteractableCard(StolenCard);
+	else if (HandCardPawn == UGameplayStatics::GetPlayerPawn(this, 0))
+		HandCardPawn->AddInteractableCard(StolenCard);
+
+	if (HandCardPawn == UGameplayStatics::GetPlayerPawn(this, 0))
+		HandCardPawn->RemoveInteractableCard(HandCard);
+	else if (StolenCardPawn == UGameplayStatics::GetPlayerPawn(this, 0))
+		StolenCardPawn->AddInteractableCard(HandCard);
 }
 
 FVector ATPawn::CalculateHandTargetLocation()
@@ -440,4 +490,20 @@ void ATPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePr
 	DOREPLIFETIME(ATPawn, JackActivated);
 	DOREPLIFETIME(ATPawn, QueenActivated);
 	DOREPLIFETIME(ATPawn, KingActivated);
+}
+
+void ATPawn::PrintInteractableCards()
+{
+	UE_LOG(LogTemp, Warning, TEXT("------------------------"));
+	for (ATCard* Card : InteractableCards)
+		UE_LOG(LogTemp, Warning, TEXT("%s: Interactable card %s"), *GetDebugStringForWorld(GetWorld()), *Card->GetName());
+	UE_LOG(LogTemp, Warning, TEXT("------------------------"));
+}
+
+void ATPawn::PrintHandCards()
+{
+	UE_LOG(LogTemp, Warning, TEXT("------------------------"));
+	for (ATCard* Card : Hand)
+		UE_LOG(LogTemp, Warning, TEXT("%s: Hand card %s"), *GetDebugStringForWorld(GetWorld()), *Card->GetName());
+	UE_LOG(LogTemp, Warning, TEXT("------------------------"));
 }
