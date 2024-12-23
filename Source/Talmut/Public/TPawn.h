@@ -41,6 +41,12 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastAddInteractableCard(ATPawn* Pawn, ATCard* CardToAdd);
 
+	UFUNCTION(Client, Reliable)
+	void ClientShowEndWidget();
+
+	UFUNCTION(BlueprintCallable, Category = "Pawn")
+	uint8 GetHandPoints() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -117,4 +123,7 @@ private:
 	uint8 KingActivated;
 	TObjectPtr<class ATCard> KingHandCard;
 	TObjectPtr<class ATCard> KingStolenCard;
+
+	UPROPERTY(EditAnywhere, Category = "Pawn|Widgets")
+	TSubclassOf<class UUserWidget> EndWidgetClass;
 };

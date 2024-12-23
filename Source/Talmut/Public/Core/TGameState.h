@@ -42,6 +42,8 @@ public:
 	void ServerCallTalmut(ATPawn* ATPawn);
 	UFUNCTION(Server, Reliable)
 	void ServerShowAllPlayerHands();
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastShowEndWidget();
 
 public:
 	UPROPERTY(Replicated)

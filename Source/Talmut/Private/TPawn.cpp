@@ -4,6 +4,7 @@
 #include "TCard.h"
 #include "TDeck.h"
 #include "TDiscardPile.h"
+#include "Blueprint/UserWidget.h"
 #include "Core/TGameState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
@@ -479,6 +480,22 @@ FVector ATPawn::CalculateDrawnTargetLocation()
 	FVector Offset = ForwardVector * 110 + RightVector + FVector(0, 0, 38.f);
 
 	return PlayerLocation + Offset;
+}
+
+void ATPawn::ClientShowEndWidget_Implementation()
+{
+	if (UUserWidget* EndWidget = CreateWidget<UUserWidget>(GetWorld(), EndWidgetClass))
+		EndWidget->AddToViewport();
+}
+
+uint8 ATPawn::GetHandPoints() const
+{
+	uint8 Points = 0;
+
+	for (ATCard* HandCard : Hand)
+		Points += static_cast<uint8>(HandCard->GetCardValue());
+
+	return Points;
 }
 
 void ATPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

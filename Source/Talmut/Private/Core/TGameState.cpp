@@ -181,7 +181,15 @@ void ATGameState::ServerShowAllPlayerHands_Implementation()
 			Rotation.Roll = 0.f;
 			HandCard->ServerMoveCard(HandCard->GetActorLocation(), Rotation);
 		}
+
+		Pawn->ClientShowEndWidget();
 	}
+}
+
+void ATGameState::MulticastShowEndWidget_Implementation()
+{
+	if (ATPawn* Pawn = Cast<ATPawn>(UGameplayStatics::GetPlayerPawn(GetWorld(), 0)))
+		Pawn->ClientShowEndWidget();
 }
 
 void ATGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
